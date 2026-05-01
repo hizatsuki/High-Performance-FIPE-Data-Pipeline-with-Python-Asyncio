@@ -245,7 +245,7 @@ def flush_excel(log: logging.Logger) -> None:
             df    = pd.DataFrame(rows)
             sheet = table[:31]          # limite de 31 chars do Excel
             df.to_excel(writer, sheet_name=sheet, index=False)
-            log.info("  [Excel] %d linhas → aba '%s'", len(df), sheet)
+            log.info("  [Excel] %d linhas -> aba '%s'", len(df), sheet)
 
     log.info("Arquivo gerado: %s", filename)
 
@@ -259,11 +259,11 @@ def save_batch(rows: list[dict], table: str, log: logging.Logger) -> None:
 
     if FIPE_SINK in ("s3", "excel"):
         _BUFFER[table].extend(rows)
-        log.info("  [buffer] %d linhas → '%s'", len(df), table)
+        log.info("  [buffer] %d linhas -> '%s'", len(df), table)
     else:
         # MySQL — grava imediatamente
         df.to_sql(name=table, con=get_engine(), if_exists="append", index=False, chunksize=500)
-        log.info("  → %d linhas → '%s'", len(df), table)
+        log.info("  -> %d linhas -> '%s'", len(df), table)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -330,7 +330,7 @@ async def _post(
                     if resp.status in (429, 403):
                         wait = 15 + random.uniform(5, 15)
                         log.warning(
-                            "HTTP %d em [%s] — aguardando %.0fs (tentativa %d/%d)",
+                            "HTTP %d em [%s] - aguardando %.0fs (tentativa %d/%d)",
                             resp.status, endpoint, wait, attempt, MAX_RETRIES,
                         )
                         await asyncio.sleep(wait)
@@ -343,7 +343,7 @@ async def _post(
                     return json.loads(body)
         except Exception as exc:
             wait = min((2 ** attempt) + random.uniform(0, 2), 30)
-            log.warning("Tentativa %d/%d [%s]: %s — aguard. %.1fs",
+            log.warning("Tentativa %d/%d [%s]: %s - aguard. %.1fs",
                         attempt, MAX_RETRIES, endpoint, exc, wait)
             if attempt == MAX_RETRIES:
                 raise
@@ -515,7 +515,7 @@ async def coleta_referencia(
         df_mod["marca"]        = marca_id
         save_batch(df_mod.to_dict("records"), cfg.tb_modelo, log)
 
-        log.info("  %s — %d modelos (paralelo)", marca_label, len(modelos))
+        log.info("  %s - %d modelos (paralelo)", marca_label, len(modelos))
 
         tarefas = [
             processar_modelo(
@@ -579,7 +579,7 @@ async def coleta_tipo(
         )
 
     elapsed = time.time() - t0
-    log.info("✔ %s concluído! %d preços em %.1f min",
+    log.info("[OK] %s concluido! %d precos em %.1f min",
              cfg.label, counters["total"], elapsed / 60)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -589,7 +589,7 @@ async def coleta_tipo(
 async def main() -> None:
     root_log = logging.getLogger("fipe")
     root_log.info("=" * 60)
-    root_log.info("FIPE Pipeline  |  carro → (moto ∥ caminhão)")
+    root_log.info("FIPE Pipeline  |  carro -> (moto || caminhao)")
     root_log.info("=" * 60)
 
     # Um único semáforo compartilhado para buscar referências (baixo volume)
@@ -613,7 +613,7 @@ async def main() -> None:
             # Coleta todo o histórico disponível
             ref_min = int(os.getenv("FIPE_REF_INICIO", str(df_refs["Codigo"].min())))
             ref_max = int(os.getenv("FIPE_REF_FIM",    str(ref_atual)))
-            root_log.info("Modo HISTÓRICO ativado (FIPE_HISTORICO=true)")
+            root_log.info("Modo HISTORICO ativado (FIPE_HISTORICO=true)")
         else:
             # Padrão: apenas a referência do mês atual — ideal para rodar no dia 1
             ref_min = int(os.getenv("FIPE_REF_INICIO", str(ref_atual)))
@@ -624,22 +624,22 @@ async def main() -> None:
             ["Codigo", "Mes"],
         ].values.tolist()
 
-        modo = "HISTÓRICO" if historico else "MÊS ATUAL"
+        modo = "HISTORICO" if historico else "MES ATUAL"
         root_log.info(
-            "%d referência(s) selecionada(s) [%s] | cod %d → %d",
+            "%d referencia(s) selecionada(s) [%s] | cod %d -> %d",
             len(refs), modo, ref_min, ref_max,
         )
 
         # ── FASE 1: Carro (prioridade máxima, roda isolado) ──────────────────
-        root_log.info("━" * 60)
-        root_log.info("FASE 1 — Coletando CARROS (tipo 1)")
-        root_log.info("━" * 60)
+        root_log.info("-" * 60)
+        root_log.info("FASE 1 - Coletando CARROS (tipo 1)")
+        root_log.info("-" * 60)
         await coleta_tipo(session, VEHICLES[1], refs, _make_logger(1))
 
         # ── FASE 2: Moto + Caminhão em paralelo ──────────────────────────────
-        root_log.info("━" * 60)
-        root_log.info("FASE 2 — Coletando MOTOS (tipo 2) ∥ CAMINHÕES (tipo 3)")
-        root_log.info("━" * 60)
+        root_log.info("-" * 60)
+        root_log.info("FASE 2 - Coletando MOTOS (tipo 2) || CAMINHOES (tipo 3)")
+        root_log.info("-" * 60)
         await asyncio.gather(
             coleta_tipo(session, VEHICLES[2], refs, _make_logger(2)),
             coleta_tipo(session, VEHICLES[3], refs, _make_logger(3)),
@@ -647,10 +647,10 @@ async def main() -> None:
 
     # ── Flush final ───────────────────────────────────────────────────────────
     if FIPE_SINK == "s3":
-        root_log.info("Enviando dados ao S3 (bucket=%s, prefix=%s)…", S3_BUCKET, S3_PREFIX)
+        root_log.info("Enviando dados ao S3 (bucket=%s, prefix=%s)...", S3_BUCKET, S3_PREFIX)
         flush_s3(root_log)
     elif FIPE_SINK == "excel":
-        root_log.info("Gravando Excel…")
+        root_log.info("Gravando Excel...")
         flush_excel(root_log)
     elif FIPE_SINK == "mysql" and _ENGINE:
         _ENGINE.dispose()
